@@ -1,6 +1,8 @@
 package com.smartcare.admin;
 
 import java.sql.Connection;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -10,15 +12,15 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
+import com.mongodb.MongoClient;
 import com.smartcare.config.DBConfig;
 import com.smartcare.config.SmartCareConstant;
+import com.smartcare.push.PatientAlert;
 import com.smartcare.utils.SmartCareUtils;
 
 @Path("/AdminService")
 public class AdminService {
 	
-	Connection con;
-    DB mongoDB = DBConfig.getMongoDB();
 	/**
 	 * 
 	 * @param patientName
@@ -27,13 +29,29 @@ public class AdminService {
     @GET
     @Path("getAppointmentDetails")
 	public String getAppointmentDetails(@QueryParam("patientName") String patientName) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
 		DBCollection appointment = mongoDB.getCollection(SmartCareConstant.APPOINTMENT);
         BasicDBObject query = new BasicDBObject("PatientName", patientName);
         DBCursor cursor = appointment.find(query);
         SmartCareUtils.writeLog("Get Patient Appointment Details for : " + patientName, null);
-        return SmartCareUtils.objectToJSON(cursor);
+        String jsonString =  SmartCareUtils.objectToJSON(cursor);
+        client.close();
+        return jsonString;
 	}
 	
+    @GET
+    @Path("logs")
+	public String logs() {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
+		DBCollection log = mongoDB.getCollection(SmartCareConstant.LOG);   
+        DBCursor cursor = log.find();
+        String jsonString =  SmartCareUtils.objectToJSON(cursor);
+        client.close();
+        return jsonString;
+	}
+    
 	/**
 	 * 
 	 * @return
@@ -41,12 +59,61 @@ public class AdminService {
 	@GET
     @Path("findAllAppointments")
 	public String findAllAppointments() {
+		MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
 		DBCollection appointment = mongoDB.getCollection(SmartCareConstant.APPOINTMENT);
         DBCursor cursor = appointment.find();
         SmartCareUtils.writeLog("Find All appointments.", null);
-        return SmartCareUtils.objectToJSON(cursor);
+        String jsonString = SmartCareUtils.objectToJSON(cursor);
+        client.close();
+        return jsonString;
 	}
 	
+	public String findMedicineHistory(Map<String, String> qryCriteriaMap) {
+		MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
+		DBCollection medHistory = mongoDB.getCollection(SmartCareConstant.MEDICAL_HISTORY);
+		
+		BasicDBObject query = new BasicDBObject();
+		
+		for (String key: qryCriteriaMap.keySet()) {
+			System.out.println(key + "/" + qryCriteriaMap.get(key));
+		}
+		
+		DBCursor cursor = medHistory.find(query);
+		
+		System.out.println("TOTAL  : " + cursor.count());
+		String jsonString = SmartCareUtils.objectToJSON(cursor);
+		//SmartCareUtils.writeLog("Find All appointments.", null);
+		client.close();
+		
+		return jsonString;
+	}
+	
+	public static void main(String args[]) {
+    	AdminService a = new AdminService();
+    	//System.out.println(a.findMedicineHistory(new HashMap<String, String>()));
+    	PatientAlert p = new PatientAlert();
+    	p.pushAlert("foo", "message,....");
+    	/*
+    	a.addBeaconDetails("BeaconID1", "Room1", "Status-Available",  80);
+    	a.addBeaconDetails("BeaconID2", "Room2", "Status-Available",  50);
+    	a.addBeaconDetails("BeaconID3", "Room3", "Status-Available",  60);
+    	a.addBeaconDetails("BeaconID4", "Room4", "Status-Available",  90);
+    	
+    	System.out.println("Beacon :" + a.findAllBeacons());
+    	System.out.println("Appointments :" + a.findAllAppointments());
+    	*/
+    	
+    	/*
+    	a.makePayment("Pradeep", "Dr. Dhingra", 10.00);
+    	a.makePayment("Wajid", "Dr. Dhingra", 100.00);
+    	a.makePayment("Pradeep", "Dr. Dhingra", 15.00);
+    	a.makePayment("Wajid", "Dr. Dhingra", 70.00);
+    	
+    	System.out.println("Payments : " + a.findPaymentDetails());
+    	*/
+    }
 	/**
 	 * 
 	 * @return
@@ -54,10 +121,13 @@ public class AdminService {
     @GET
     @Path("findBeaconDetails")
 	public String findBeaconDetails() {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
 		DBCollection beacon = mongoDB.getCollection(SmartCareConstant.BEACON);
         DBCursor cursor = beacon.find();
         SmartCareUtils.writeLog("Find beacon details", null);
-        return SmartCareUtils.objectToJSON(cursor);
+        String jsonString = SmartCareUtils.objectToJSON(cursor);
+        client.close();return jsonString;
 	}
 	
 	/**
@@ -72,7 +142,9 @@ public class AdminService {
     @Path("addBeaconDetails")
 	public boolean addBeaconDetails(@QueryParam("beaconId") String beaconId, @QueryParam("location") String location, 
 								    @QueryParam("status") String status, @QueryParam("batteryLevel") int batteryLevel) {
-		DBCollection beacon = mongoDB.getCollection(SmartCareConstant.BEACON);
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
+    	DBCollection beacon = mongoDB.getCollection(SmartCareConstant.BEACON);
     	BasicDBObject doc = new BasicDBObject("BeaconId", beaconId)
     							.append("Location", location)
     							.append("Status", status)
@@ -80,8 +152,27 @@ public class AdminService {
     							.append("DateTime", SmartCareUtils.getDateAndTime());
     	String error = beacon.insert(doc).getError();
     	SmartCareUtils.writeLog("Add Beacon data for : " + beaconId, error);
+    	client.close();
     	return error == null;
 	}
+    
+    /**
+     * 
+     * @return
+     */
+    @GET
+    @Path("findAllBeacons")
+    public String findAllBeacons() {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
+    	DBCollection beacon = mongoDB.getCollection(SmartCareConstant.BEACON);
+    	DBCursor cursor = beacon.find();
+    	SmartCareUtils.writeLog("Find all Beacons.", null);
+    	String jsonString =  SmartCareUtils.objectToJSON(cursor);
+    	client.close();
+    	return jsonString;
+    }
+    
 	
 	/**
 	 * 
@@ -94,13 +185,17 @@ public class AdminService {
     @Path("makePayment")
 	public boolean makePayment(@QueryParam("patientName") String patientName, @QueryParam("physicianName") String physicianName, 
 							   @QueryParam("billedAmount") Double billedAmount) {
-		DBCollection payment = mongoDB.getCollection(SmartCareConstant.PAYMENT);
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
+    	DBCollection payment = mongoDB.getCollection(SmartCareConstant.PAYMENT);
     	BasicDBObject doc = new BasicDBObject("PatientName", patientName)
     							.append("PhysicianName", physicianName)
     							.append("BilledAmount", billedAmount)
+    							.append("PaymentStatus", true)
     							.append("DateTime", SmartCareUtils.getDateAndTime());
     	String error = payment.insert(doc).getError();
     	SmartCareUtils.writeLog("Save Payment for : " + patientName, error);
+    	client.close();
     	return error == null;
 	}
 	
@@ -111,17 +206,13 @@ public class AdminService {
     @GET
     @Path("findPaymentDetails")
 	public String findPaymentDetails() {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
 		DBCollection payment = mongoDB.getCollection(SmartCareConstant.PAYMENT);
         DBCursor cursor = payment.find();
-        System.out.println("payment details ...");
         SmartCareUtils.writeLog("Find All payments.", null);
-        return SmartCareUtils.objectToJSON(cursor);
+        String jsonString = SmartCareUtils.objectToJSON(cursor);
+        client.close();
+        return jsonString;
 	}
-    
-    public static void main(String args[]) {
-        AdminService a = new AdminService();
-        System.out.println(a.findPaymentDetails());
-        
-        
-    }
 }

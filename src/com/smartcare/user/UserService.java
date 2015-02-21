@@ -14,10 +14,14 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
+import com.mongodb.MongoClient;
 import com.smartcare.config.DBConfig;
 import com.smartcare.config.SmartCareConstant;
+import com.smartcare.push.PatientAlert;
 import com.smartcare.utils.SmartCareUtils;
+
 import java.io.IOException;
+
 import org.apache.http.client.ClientProtocolException;
 
 
@@ -27,10 +31,6 @@ public class UserService {
 	
     @Context
     private HttpServletRequest request;
-    
-	Connection con;
-    DB mongoDB = DBConfig.getMongoDB();
-    
     
     /**
      * 
@@ -51,6 +51,8 @@ public class UserService {
     	}
     	
     	String md5Password = SmartCareUtils.MD5(password);
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	
     	DBCollection users = mongoDB.getCollection(SmartCareConstant.USER);
     	BasicDBObject doc = new BasicDBObject("UserName", userName)
@@ -59,24 +61,33 @@ public class UserService {
     							.append("LastName",lastName);
     	String error = users.insert(doc).getError();
     	SmartCareUtils.writeLog("Register user : " + userName, error);
+    	client.close();
     	return error == null;
     }
     
     private boolean _isUserNameUnique(String userName) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection users = mongoDB.getCollection(SmartCareConstant.USER);
     	BasicDBObject query = new BasicDBObject("UserName", userName);
     	DBCursor cursor = users.find(query);
     	
-    	return cursor.count() == 0;
+    	boolean unique =  cursor.count() == 0;
+    	client.close();
+    	return unique;
     }
     
     @GET
     @Path("findAllUsers")
     public String findAllUsers() {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection users = mongoDB.getCollection(SmartCareConstant.USER);
     	DBCursor cursor = users.find();
     	SmartCareUtils.writeLog("Find all User.", null);
-    	return SmartCareUtils.objectToJSON(cursor);
+    	String jsonString =  SmartCareUtils.objectToJSON(cursor);
+    	client.close();
+    	return jsonString;
     }
     
      /**
@@ -88,12 +99,15 @@ public class UserService {
     @GET
     @Path("authenticate")
     public boolean authenticate (@QueryParam("userName") String userName, @QueryParam("password") String password) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection users = mongoDB.getCollection(SmartCareConstant.USER);
         BasicDBObject query = new BasicDBObject("UserName", userName)
         					.append("Password", SmartCareUtils.MD5(password));
         DBCursor cursor = users.find(query);
         boolean status = cursor.size() == 1;
         SmartCareUtils.writeLog("Authenticate User: " + userName + " Status  : " + status, null);
+        client.close();
         return status;
     }
     
@@ -105,14 +119,18 @@ public class UserService {
     @GET
     @Path("getPassword")
     public String getPassword(@QueryParam("userName") String userName) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection users = mongoDB.getCollection(SmartCareConstant.USER);
         BasicDBObject query = new BasicDBObject("UserName", userName);
         DBCursor cursor = users.find(query);
         SmartCareUtils.writeLog("Get Password for User: " + userName, null);
+        String password = null;
         if ( cursor.hasNext()) {
-        	return (String)cursor.next().get("Password");
+        	password = (String)cursor.next().get("Password");
         }
-    	return null;
+        client.close();
+    	return password;
     }
    
     /**
@@ -127,6 +145,8 @@ public class UserService {
     @Path("savePrefeerence")
     public boolean savePrefeerence(@QueryParam("autoCheckin") boolean autoCheckin, @QueryParam("enablePacemakerAlert") boolean enablePacemakerAlert, 
     							   @QueryParam("paymentViaBeacon") boolean paymentViaBeacon, @QueryParam("userName") String userName ) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection pref = mongoDB.getCollection(SmartCareConstant.USER_PREFERENCE);
     	BasicDBObject doc = new BasicDBObject("UserName", userName)
     							.append("AutoCheckin", autoCheckin)
@@ -134,6 +154,7 @@ public class UserService {
     							.append("PaymentViaBeacon",paymentViaBeacon);
     	String error = pref.insert(doc).getError();
     	SmartCareUtils.writeLog("Save User Preference for User : " + userName , error);
+    	client.close();
     	return error == null;
     }
     
@@ -145,11 +166,15 @@ public class UserService {
     @GET
     @Path("getUSerPreferences")
     public String getUSerPreferences(@QueryParam("userName") String userName) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection users = mongoDB.getCollection(SmartCareConstant.USER_PREFERENCE);
         BasicDBObject query = new BasicDBObject("UserName", userName);
         DBCursor cursor = users.find(query);
         SmartCareUtils.writeLog("Get User Preference for User : " + userName, null);
-        return SmartCareUtils.objectToJSON(cursor);
+        String jsonString =  SmartCareUtils.objectToJSON(cursor);
+        client.close();
+        return jsonString;
     }
     
     /**
@@ -167,6 +192,8 @@ public class UserService {
     public boolean saveCCData(@QueryParam("ccNumber") String ccNumber, @QueryParam("street") String street, 
     					      @QueryParam("city") String city, @QueryParam("zipCode") String zipCode, @QueryParam("stateCode") String stateCode, 
     					      @QueryParam("userName") String userName) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection cc = mongoDB.getCollection(SmartCareConstant.CREDITCARD);
     	BasicDBObject doc = new BasicDBObject("UserName", userName)
     							.append("CCNumber", ccNumber)
@@ -176,6 +203,7 @@ public class UserService {
     							.append("StateCode", stateCode);
     	String error = cc.insert(doc).getError();
     	SmartCareUtils.writeLog("Save Credit Card Data for User : " + userName, error);
+    	client.close();
     	return error == null;
     }
     
@@ -187,11 +215,14 @@ public class UserService {
     @GET
     @Path("findCCInfo")
     public String findCCInfo(@QueryParam("userName") String userName) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection cc = mongoDB.getCollection(SmartCareConstant.CREDITCARD);
         BasicDBObject query = new BasicDBObject("UserName", userName);
         DBCursor cursor = cc.find(query);
         SmartCareUtils.writeLog("Find CreditCard Info for User: " + userName, null);
-        return SmartCareUtils.objectToJSON(cursor);
+        String jsonString =  SmartCareUtils.objectToJSON(cursor);
+        client.close();return jsonString;
     }
 
     /**
@@ -205,6 +236,8 @@ public class UserService {
     @Path("saveAlert")
     public boolean saveAlert(@QueryParam("primaryPhysician") String primaryPhysician, @QueryParam("secondaryPhysician") String secondaryPhysician, 
     						 @QueryParam("userName") String userName) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection alert = mongoDB.getCollection(SmartCareConstant.ALERT);
     	BasicDBObject doc = new BasicDBObject("UserName", userName)
     							.append("PrimaryPhysician", primaryPhysician)
@@ -212,6 +245,7 @@ public class UserService {
     							.append("DateTime", SmartCareUtils.getDateAndTime());
     	String error = alert.insert(doc).getError();
     	SmartCareUtils.writeLog("Save Alert data for User: " + userName, error);
+    	client.close();
     	return error == null;
     }
 
@@ -223,11 +257,15 @@ public class UserService {
     @GET
     @Path("findAlerts")
     public String findAlerts(@QueryParam("userName") String userName) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection alert = mongoDB.getCollection(SmartCareConstant.ALERT);
         BasicDBObject query = new BasicDBObject("UserName", userName);
         DBCursor cursor = alert.find(query);
         SmartCareUtils.writeLog("Find Alert for User: " + userName, null);
-        return SmartCareUtils.objectToJSON(cursor);
+        String jsonString =  SmartCareUtils.objectToJSON(cursor);
+        client.close();
+        return jsonString;
     }
     
     /**
@@ -241,12 +279,16 @@ public class UserService {
     @Path("makeAppointment")
     public boolean makeAppointment(@QueryParam("patientName") String patientName, @QueryParam("physicianName") String physicianName, 
     							   @QueryParam("dateTime") String dateTime) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection appointment = mongoDB.getCollection(SmartCareConstant.APPOINTMENT);
     	BasicDBObject doc = new BasicDBObject("PatientName", patientName)
     							.append("PhysicianName", physicianName)
     							.append("DateTime", dateTime);
     	String error = appointment.insert(doc).getError();
+    	//TODO: Create makePayment  with false.
     	SmartCareUtils.writeLog("Create Appointment for User : " + patientName, error);
+    	client.close();
     	return error == null;
     }
     
@@ -259,12 +301,15 @@ public class UserService {
     @GET
     @Path("patientCheckIn")
     public boolean patientCheckIn(@QueryParam("patientName") String patientName, @QueryParam("checkInStatus") boolean checkInStatus) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection checkin = mongoDB.getCollection(SmartCareConstant.CHECKIN);
     	BasicDBObject doc = new BasicDBObject("PatientName", patientName)
     							.append("CheckInTime", SmartCareUtils.getDateAndTime())
     							.append("CheckInStatus", checkInStatus);
     	String error = checkin.insert(doc).getError();
     	SmartCareUtils.writeLog("Patient Check-in for Patient : " + patientName, error);
+    	client.close();
     	return error == null;
     }
     
@@ -277,12 +322,21 @@ public class UserService {
     @GET
     @Path("updateHeartRate")
     public boolean updateHeartRate(@QueryParam("patientName") String patientName, @QueryParam("heartBeatRate") int heartBeatRate) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection checkin = mongoDB.getCollection(SmartCareConstant.HEART_BEAT);
     	BasicDBObject doc = new BasicDBObject("PatientName", patientName)
     							.append("HeartBeatRate", heartBeatRate)
     							.append("DateTime", SmartCareUtils.getDateAndTime());
     	String error = checkin.insert(doc).getError();
     	SmartCareUtils.writeLog("Update heart rate for patient : " + patientName, error);
+    	client.close();
+    	
+    	if (heartBeatRate < 60 || heartBeatRate > 90) {
+    		PatientAlert pA = new PatientAlert();
+    		pA.pushAlert("Alert : " + patientName , "Heartbeat update. Recorded heart rate :" + 
+    					 heartBeatRate + " Recorded time: " + SmartCareUtils.getDateAndTime()); 
+    	}
     	return error == null;
     }
     
@@ -301,6 +355,8 @@ public class UserService {
     public boolean savePatientData(@QueryParam("patientName") String patientName, @QueryParam("age") int age, @QueryParam("sex") String sex, 
     							   @QueryParam("address") String address, @QueryParam("pastMedHistory") String pastMedHistory, 
     							   @QueryParam("diseasSymptom") String diseaseSymptom) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection patientData = mongoDB.getCollection(SmartCareConstant.PATIENT_DATA);
     	BasicDBObject doc = new BasicDBObject("PatientName", patientName)
     							.append("Age", age)
@@ -311,6 +367,7 @@ public class UserService {
     							.append("DateTime", SmartCareUtils.getDateAndTime());
     	String error = patientData.insert(doc).getError();
     	SmartCareUtils.writeLog("Save Patient Data for :" + patientName, error);
+    	client.close();
     	return error == null;
     }
     
@@ -322,22 +379,26 @@ public class UserService {
     @GET
     @Path("findPatientData")
     public String findPatientData(@QueryParam("patientName") String patientName) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection alert = mongoDB.getCollection(SmartCareConstant.PATIENT_DATA);
         BasicDBObject query = new BasicDBObject("PatientName", patientName);
         DBCursor cursor = alert.find(query);
         SmartCareUtils.writeLog("Find Patient data for : " + patientName, null);
-        return SmartCareUtils.objectToJSON(cursor);
+        String jsonString = SmartCareUtils.objectToJSON(cursor);
+        client.close();
+        return jsonString;
     }
     
     public static void main(String[] args)throws ClientProtocolException, IOException {
     	UserService u = new UserService();
-    	u.savePrefeerence(true, true,false, "pradeep");
-    	System.out.println("DATA  : " + u.findPatientData("pradeep"));
- 
-    	String register = "http://localhost:8080/SmartCareAWS/rest/UserService/register?userName=Pradeep&password=pradeep&firstName=Pradeep&lastName=Vasudeva";	
-    	System.out.println("Register User : " + SmartCareUtils.runService(register));
     	
-    	String findAllUsers = "http://localhost:8080/SmartCareAWS/rest/UserService/findAllUsers";
-    	System.out.println("Find All Users : " + SmartCareUtils.runService(findAllUsers));
+    	u.updateHeartRate("Pradeep", 92);
+    	/*
+    	u.makeAppointment("Pradeep", "Dr.Dhingra",  "Thu 2015.02.18 at 10:30:00 AM PST");
+    	u.makeAppointment("Wajid", "Dr.Rao",  "Thu 2015.03.01 at 10:30:00 AM PST");
+    	u.makeAppointment("Pradeep", "Dr. Dhingra",  "Thu 2015.02.20 at 02:00:00 PM PST");
+    	*/
+    	
     }
 }

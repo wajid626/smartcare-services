@@ -20,6 +20,7 @@ import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
+import com.mongodb.MongoClient;
 import com.mongodb.util.JSON;
 import com.smartcare.config.DBConfig;
 import com.smartcare.config.SmartCareConstant;
@@ -43,12 +44,14 @@ public  class SmartCareUtils {
 		 }
 		 	 
 		 public static void writeLog(String logDetails,String error) {
-			 DB mongoDB = DBConfig.getMongoDB();
+			 MongoClient client = DBConfig.getMongoDB();
+			 DB mongoDB = client.getDB(SmartCareConstant.DB);
 			 DBCollection log = mongoDB.getCollection(SmartCareConstant.LOG);
 			 BasicDBObject doc = new BasicDBObject("Description", logDetails)
 			 						.append("Error", error)
 			 						.append("DateTime", getDateAndTime());
 			 log.insert(doc);
+			 client.close();
 		 }
 		 
 		public static String getDateAndTime() {
