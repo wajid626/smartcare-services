@@ -13,6 +13,7 @@ import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
 import com.mongodb.MongoClient;
+import com.mongodb.WriteResult;
 import com.smartcare.config.DBConfig;
 import com.smartcare.config.SmartCareConstant;
 import com.smartcare.push.PatientAlert;
@@ -192,17 +193,56 @@ public class AdminService {
     	MongoClient client = DBConfig.getMongoDB();
     	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection payment = mongoDB.getCollection(SmartCareConstant.PAYMENT);
+    	//Find the Payment Record.
+    	BasicDBObject query = new BasicDBObject("PatientName", patientName)
+    								.append("PhysicianName", physicianName)
+    								.append("BilledAmount", billedAmount);
+     
+    	DBCursor cursor = payment.find(query);		
+    	
+    	if ( null == cursor || !cursor.hasNext()) {
+    		SmartCareUtils.writeLog("Make Payment for : " + patientName  + "  Physician : " + physicianName 
+    							 + " Billed Amount : " + billedAmount + " Not found.", null);
+    		return false;
+    	}
+    	
+    	//2. Update the Payment status
+        BasicDBObject updatePayment = new BasicDBObject();
+        updatePayment.append("$set", new BasicDBObject().append("PaymentStatus", true)
+        								.append("PaymentCreateDateTime", SmartCareUtils.getDateAndTime()));
+        								
+        WriteResult result = payment.update(query, updatePayment);
+        if ( null != result.getError()) {
+        	SmartCareUtils.writeLog("Make Payment for : " + patientName  + "  Physician : " + physicianName 
+					 + " Billed Amount : " + billedAmount + " failed..", result.getError());
+        	return false;
+        }
+        
+        SmartCareUtils.writeLog("Make Payment for : " + patientName  + "  Physician : " + physicianName 
+				 + " Billed Amount : " + billedAmount + " completed.", null);
+    	client.close();
+    	return true;
+	}
+	
+    
+    @GET
+    @Path("createPayment")
+	public boolean createPayment(@QueryParam("patientName") String patientName, @QueryParam("physicianName") String physicianName, 
+							   @QueryParam("billedAmount") Double billedAmount) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
+    	DBCollection payment = mongoDB.getCollection(SmartCareConstant.PAYMENT);
     	BasicDBObject doc = new BasicDBObject("PatientName", patientName)
     							.append("PhysicianName", physicianName)
     							.append("BilledAmount", billedAmount)
-    							.append("PaymentStatus", true)
+    							.append("PaymentStatus", false)
     							.append("DateTime", SmartCareUtils.getDateAndTime());
     	String error = payment.insert(doc).getError();
     	SmartCareUtils.writeLog("Save Payment for : " + patientName, error);
     	client.close();
     	return error == null;
 	}
-	
+    
 	/**
 	 * 
 	 * @return

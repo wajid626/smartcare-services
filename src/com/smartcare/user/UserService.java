@@ -14,7 +14,10 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
+import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
+import com.mongodb.WriteResult;
+import com.smartcare.admin.AdminService;
 import com.smartcare.config.DBConfig;
 import com.smartcare.config.SmartCareConstant;
 import com.smartcare.push.PatientAlert;
@@ -284,9 +287,10 @@ public class UserService {
     	DBCollection appointment = mongoDB.getCollection(SmartCareConstant.APPOINTMENT);
     	BasicDBObject doc = new BasicDBObject("PatientName", patientName)
     							.append("PhysicianName", physicianName)
-    							.append("DateTime", dateTime);
+    							.append("CheckInStatus", false)
+    							.append("CheckInDateTime",null)
+    							.append("CreateDate", dateTime);
     	String error = appointment.insert(doc).getError();
-    	//TODO: Create makePayment  with false.
     	SmartCareUtils.writeLog("Create Appointment for User : " + patientName, error);
     	client.close();
     	return error == null;
@@ -303,14 +307,41 @@ public class UserService {
     public boolean patientCheckIn(@QueryParam("patientName") String patientName, @QueryParam("checkInStatus") boolean checkInStatus) {
     	MongoClient client = DBConfig.getMongoDB();
     	DB mongoDB = client.getDB(SmartCareConstant.DB);
-    	DBCollection checkin = mongoDB.getCollection(SmartCareConstant.CHECKIN);
-    	BasicDBObject doc = new BasicDBObject("PatientName", patientName)
-    							.append("CheckInTime", SmartCareUtils.getDateAndTime())
-    							.append("CheckInStatus", checkInStatus);
-    	String error = checkin.insert(doc).getError();
-    	SmartCareUtils.writeLog("Patient Check-in for Patient : " + patientName, error);
+    	
+    	//1. Find the Appointment and update the CheckIn Status
+    	DBCollection appointment = mongoDB.getCollection(SmartCareConstant.APPOINTMENT);
+    	BasicDBObject query = new BasicDBObject("PatientName", patientName);
+     
+    	DBCursor cursor = appointment.find(query);		
+        
+        if ( cursor == null || !cursor.hasNext() ) {
+        	SmartCareUtils.writeLog("Patient Check-in for Patient failed: " + patientName, " No appoinement found!");
+        	return false;
+        }
+        DBObject patientAppointment = cursor.next();
+        
+        //2. Update the Check-In status
+        BasicDBObject checkIn = new BasicDBObject();
+    	checkIn.append("$set", new BasicDBObject().append("CheckInStatus", true)
+    								.append("CheckInDateTime", SmartCareUtils.getDateAndTime()));
+    	
+        WriteResult result = appointment.update(query, checkIn);
+        if ( null != result.getError()) {
+        	SmartCareUtils.writeLog("Patient Check-in for Patient failed: " + patientName, result.getError());
+        	return false;
+        }
+        
+        String appoinemtnWithDoctor = (String) patientAppointment.get("PhysicianName");
+        
+    	SmartCareUtils.writeLog("Patient Check-in for Patient : " + patientName, null);
     	client.close();
-    	return error == null;
+    	
+    	AdminService admin = new AdminService();
+    	
+    	//3. When Patient check-in, we will create a payment record.
+    	admin.createPayment(patientName, appoinemtnWithDoctor, 25.0);
+    	
+    	return true;
     }
     
     /**
@@ -393,12 +424,11 @@ public class UserService {
     public static void main(String[] args)throws ClientProtocolException, IOException {
     	UserService u = new UserService();
     	
-    	u.updateHeartRate("Pradeep", 92);
-    	/*
-    	u.makeAppointment("Pradeep", "Dr.Dhingra",  "Thu 2015.02.18 at 10:30:00 AM PST");
-    	u.makeAppointment("Wajid", "Dr.Rao",  "Thu 2015.03.01 at 10:30:00 AM PST");
-    	u.makeAppointment("Pradeep", "Dr. Dhingra",  "Thu 2015.02.20 at 02:00:00 PM PST");
-    	*/
+    	//u.makeAppointment("Pradeep", "Dr. Foo", SmartCareUtils.getDateAndTime());
+    	//u.patientCheckIn("Pradeep", true);
+    	
+    	AdminService a = new AdminService();
+    	a.makePayment("Pradeep", "Dr. Foo", 25.0);
     	
     }
 }
