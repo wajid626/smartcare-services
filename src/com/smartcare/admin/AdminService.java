@@ -78,6 +78,7 @@ public class AdminService {
 		
 		for (String key: qryCriteriaMap.keySet()) {
 			System.out.println(key + "/" + qryCriteriaMap.get(key));
+			query = query.append(key,  qryCriteriaMap.get(key));
 		}
 		
 		DBCursor cursor = medHistory.find(query);
@@ -92,9 +93,12 @@ public class AdminService {
 	
 	public static void main(String args[]) {
     	AdminService a = new AdminService();
-    	//System.out.println(a.findMedicineHistory(new HashMap<String, String>()));
-    	PatientAlert p = new PatientAlert();
-    	p.pushAlert("foo", "message,....");
+    	HashMap<String, String> qryMap = new HashMap<String, String>();
+    	qryMap.put("Disease", "Hepatitis B");
+    	qryMap.put("Drug", "Twinrix");
+    	System.out.println(a.findMedicineHistory(qryMap));
+    	//PatientAlert p = new PatientAlert();
+    	//p.pushAlert("foo", "message,....");
     	/*
     	a.addBeaconDetails("BeaconID1", "Room1", "Status-Available",  80);
     	a.addBeaconDetails("BeaconID2", "Room2", "Status-Available",  50);
