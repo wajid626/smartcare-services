@@ -99,13 +99,6 @@ public class AnalyticUtil {
 			drugWorkedNotWorkedMap.put(key, workedNotWorked);
 		}
 		
-		for(String key : drugWorkedNotWorkedMap.keySet()) {
-			System.out.print(key + " - ");
-			for(Integer val : drugWorkedNotWorkedMap.get(key)) {
-				System.out.print(val + " - " );
-			}
-			System.out.println("");
-		}
 		return drugWorkedNotWorkedMap;
 	}
 }
