@@ -1,6 +1,7 @@
 package com.smartcare.user;
 
 import java.sql.Connection;
+import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
@@ -16,6 +17,7 @@ import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
+import com.mongodb.MongoClientURI;
 import com.mongodb.WriteResult;
 import com.smartcare.admin.AdminService;
 import com.smartcare.config.DBConfig;
@@ -35,6 +37,8 @@ public class UserService {
     @Context
     private HttpServletRequest request;
     
+    private static final String PRIMARY_DOC = "Scot";
+    private static final String SECONDARY_DOC = "Jay";
     /**
      * 
      * @param userName
@@ -237,17 +241,20 @@ public class UserService {
      */
     @GET
     @Path("saveAlert")
-    public boolean saveAlert(@QueryParam("primaryPhysician") String primaryPhysician, @QueryParam("secondaryPhysician") String secondaryPhysician, 
-    						 @QueryParam("userName") String userName) {
+    public boolean saveAlert(@QueryParam("alertId") String alertId, @QueryParam("primaryPhysician") String primaryPhysician, 
+    						 @QueryParam("secondaryPhysician") String secondaryPhysician, @QueryParam("patientName") String patientName,
+    						 @QueryParam("message") String message) {
     	MongoClient client = DBConfig.getMongoDB();
     	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection alert = mongoDB.getCollection(SmartCareConstant.ALERT);
-    	BasicDBObject doc = new BasicDBObject("UserName", userName)
+    	BasicDBObject doc = new BasicDBObject("AlertId", alertId)
+    							.append("PatientName", patientName)
     							.append("PrimaryPhysician", primaryPhysician)
     							.append("SecondaryPhysician", secondaryPhysician)
+    							.append("Message", message)
     							.append("DateTime", SmartCareUtils.getDateAndTime());
     	String error = alert.insert(doc).getError();
-    	SmartCareUtils.writeLog("Save Alert data for User: " + userName, error);
+    	SmartCareUtils.writeLog("Save Alert data for User: " + patientName + " Message : " + message, error);
     	client.close();
     	return error == null;
     }
@@ -259,13 +266,27 @@ public class UserService {
      */
     @GET
     @Path("findAlerts")
-    public String findAlerts(@QueryParam("userName") String userName) {
+    public String findAlertsForPatient(@QueryParam("patientName") String patientName) {
     	MongoClient client = DBConfig.getMongoDB();
     	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection alert = mongoDB.getCollection(SmartCareConstant.ALERT);
-        BasicDBObject query = new BasicDBObject("UserName", userName);
+        BasicDBObject query = new BasicDBObject("PatientName", patientName);
         DBCursor cursor = alert.find(query);
-        SmartCareUtils.writeLog("Find Alert for User: " + userName, null);
+        SmartCareUtils.writeLog("Find Alert for User: " + patientName, null);
+        String jsonString =  SmartCareUtils.objectToJSON(cursor);
+        client.close();
+        return jsonString;
+    }
+    
+    @GET
+    @Path("findMyAlerts")
+    public String findMyAlerts(@QueryParam("physicianName") String physicianName) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
+    	DBCollection alert = mongoDB.getCollection(SmartCareConstant.ALERT);
+        BasicDBObject query = new BasicDBObject("PrimaryPhysician", physicianName);
+        DBCursor cursor = alert.find(query);
+        SmartCareUtils.writeLog("Find My alerts : " + physicianName, null);
         String jsonString =  SmartCareUtils.objectToJSON(cursor);
         client.close();
         return jsonString;
@@ -365,8 +386,10 @@ public class UserService {
     	
     	if (heartBeatRate < 60 || heartBeatRate > 90) {
     		PatientAlert pA = new PatientAlert();
-    		pA.pushAlert("Alert : " + patientName , "Heartbeat update. Recorded heart rate :" + 
+    		String alertID = pA.pushAlert("Alert : " + patientName , "Heartbeat update. Recorded heart rate :" + 
     					 heartBeatRate + " Recorded time: " + SmartCareUtils.getDateAndTime()); 
+    		saveAlert(alertID, PRIMARY_DOC, SECONDARY_DOC, patientName, "Heartbeat update. Recorded heart rate :" +  heartBeatRate);
+    		
     	}
     	return error == null;
     }
@@ -423,12 +446,14 @@ public class UserService {
     
     public static void main(String[] args)throws ClientProtocolException, IOException {
     	UserService u = new UserService();
-    	
+    //	u.saveAlert("AlertId", PRIMARY_DOC, SECONDARY_DOC, "Mr. Patient", "Heart rate too low");
+    	//System.out.println(u.findMyAlerts(PRIMARY_DOC));
     	//u.makeAppointment("Pradeep", "Dr. Foo", SmartCareUtils.getDateAndTime());
     	//u.patientCheckIn("Pradeep", true);
     	
-    	AdminService a = new AdminService();
-    	a.makePayment("Pradeep", "Dr. Foo", 25.0);
+    	//AdminService a = new AdminService();
+    	//a.makePayment("Pradeep", "Dr. Foo", 25.0);
+    	System.out.println(SmartCareUtils.runService("http://localhost:8080/SmartCareAWS/rest/UserService/findAlerts?patientName=Mr.%20Patient"));
     	
     }
 }

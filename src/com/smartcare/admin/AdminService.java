@@ -209,7 +209,7 @@ public class AdminService {
     	//2. Update the Payment status
         BasicDBObject updatePayment = new BasicDBObject();
         updatePayment.append("$set", new BasicDBObject().append("PaymentStatus", true)
-        								.append("PaymentCreateDateTime", SmartCareUtils.getDateAndTime()));
+        								.append("PaymentPostedDateTime", SmartCareUtils.getDateAndTime()));
         								
         WriteResult result = payment.update(query, updatePayment);
         if ( null != result.getError()) {
