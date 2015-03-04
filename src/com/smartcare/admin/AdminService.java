@@ -78,15 +78,12 @@ public class AdminService {
 		BasicDBObject query = new BasicDBObject();
 		
 		for (String key: qryCriteriaMap.keySet()) {
-			System.out.println(key + "/" + qryCriteriaMap.get(key));
 			query = query.append(key,  qryCriteriaMap.get(key));
 		}
 		
 		DBCursor cursor = medHistory.find(query);
 		
-		System.out.println("TOTAL  : " + cursor.count());
 		String jsonString = SmartCareUtils.objectToJSON(cursor);
-		//SmartCareUtils.writeLog("Find All appointments.", null);
 		client.close();
 		
 		return jsonString;
@@ -189,7 +186,7 @@ public class AdminService {
     @GET
     @Path("makePayment")
 	public boolean makePayment(@QueryParam("patientName") String patientName, @QueryParam("physicianName") String physicianName, 
-							   @QueryParam("billedAmount") Double billedAmount) {
+							   @QueryParam("billedAmount") Double billedAmount, @QueryParam("paypalConfirmId") String paypalConfirmId) {
     	MongoClient client = DBConfig.getMongoDB();
     	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection payment = mongoDB.getCollection(SmartCareConstant.PAYMENT);
@@ -209,6 +206,7 @@ public class AdminService {
     	//2. Update the Payment status
         BasicDBObject updatePayment = new BasicDBObject();
         updatePayment.append("$set", new BasicDBObject().append("PaymentStatus", true)
+        								.append("PaypalConfirmId", paypalConfirmId)
         								.append("PaymentPostedDateTime", SmartCareUtils.getDateAndTime()));
         								
         WriteResult result = payment.update(query, updatePayment);

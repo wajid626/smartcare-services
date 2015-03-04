@@ -1,6 +1,7 @@
 package com.smartcare.user;
 
 import java.sql.Connection;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
@@ -11,6 +12,13 @@ import javax.ws.rs.core.Context;
 
 import org.apache.http.client.HttpClient;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.MalformedJsonException;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -26,8 +34,10 @@ import com.smartcare.push.PatientAlert;
 import com.smartcare.utils.SmartCareUtils;
 
 import java.io.IOException;
+import java.io.StringReader;
 
 import org.apache.http.client.ClientProtocolException;
+import org.bson.types.ObjectId;
 
 
 
@@ -149,8 +159,8 @@ public class UserService {
      * @return
      */
     @GET
-    @Path("savePrefeerence")
-    public boolean savePrefeerence(@QueryParam("autoCheckin") boolean autoCheckin, @QueryParam("enablePacemakerAlert") boolean enablePacemakerAlert, 
+    @Path("savePreference")
+    public boolean savePreference(@QueryParam("autoCheckin") boolean autoCheckin, @QueryParam("enablePacemakerAlert") boolean enablePacemakerAlert, 
     							   @QueryParam("paymentViaBeacon") boolean paymentViaBeacon, @QueryParam("userName") String userName ) {
     	MongoClient client = DBConfig.getMongoDB();
     	DB mongoDB = client.getDB(SmartCareConstant.DB);
@@ -271,7 +281,7 @@ public class UserService {
     	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection alert = mongoDB.getCollection(SmartCareConstant.ALERT);
         BasicDBObject query = new BasicDBObject("PatientName", patientName);
-        DBCursor cursor = alert.find(query);
+        DBCursor cursor = alert.find(query).sort(new BasicDBObject("DateTime", -1));
         SmartCareUtils.writeLog("Find Alert for User: " + patientName, null);
         String jsonString =  SmartCareUtils.objectToJSON(cursor);
         client.close();
@@ -285,8 +295,22 @@ public class UserService {
     	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection alert = mongoDB.getCollection(SmartCareConstant.ALERT);
         BasicDBObject query = new BasicDBObject("PrimaryPhysician", physicianName);
-        DBCursor cursor = alert.find(query);
-        SmartCareUtils.writeLog("Find My alerts : " + physicianName, null);
+        DBCursor cursor = alert.find(query).sort(new BasicDBObject("DateTime", -1));
+        SmartCareUtils.writeLog("Find alert for Id : " + physicianName, null);
+        String jsonString =  SmartCareUtils.objectToJSON(cursor);
+        client.close();
+        return jsonString;
+    }
+    
+    @GET
+    @Path("findAlertsById")
+    public String findAlertsById(@QueryParam("id") String id) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
+    	DBCollection alert = mongoDB.getCollection(SmartCareConstant.ALERT);
+        BasicDBObject query = new BasicDBObject("_id", new ObjectId(id));
+        DBCursor cursor = alert.find(query).sort(new BasicDBObject("DateTime", -1));
+        SmartCareUtils.writeLog("Find alert for Id : " + id, null);
         String jsonString =  SmartCareUtils.objectToJSON(cursor);
         client.close();
         return jsonString;
@@ -393,67 +417,65 @@ public class UserService {
     	}
     	return error == null;
     }
-    
-    /**
-     * 
-     * @param patientName
-     * @param age
-     * @param sex
-     * @param address
-     * @param pastMedHistory
-     * @param diseaseSymptom
-     * @return
-     */
-    @GET
-    @Path("savePatientData")
-    public boolean savePatientData(@QueryParam("patientName") String patientName, @QueryParam("age") int age, @QueryParam("sex") String sex, 
-    							   @QueryParam("address") String address, @QueryParam("pastMedHistory") String pastMedHistory, 
-    							   @QueryParam("diseasSymptom") String diseaseSymptom) {
-    	MongoClient client = DBConfig.getMongoDB();
-    	DB mongoDB = client.getDB(SmartCareConstant.DB);
-    	DBCollection patientData = mongoDB.getCollection(SmartCareConstant.PATIENT_DATA);
-    	BasicDBObject doc = new BasicDBObject("PatientName", patientName)
-    							.append("Age", age)
-    							.append("Sex", sex)
-    							.append("Address", address)
-    							.append("PastMedHistory", pastMedHistory)
-    							.append("SiseaseSymptom",  diseaseSymptom)
-    							.append("DateTime", SmartCareUtils.getDateAndTime());
-    	String error = patientData.insert(doc).getError();
-    	SmartCareUtils.writeLog("Save Patient Data for :" + patientName, error);
-    	client.close();
-    	return error == null;
-    }
-    
-    /**
-     * 
-     * @param patientName
-     * @return
-     */
-    @GET
-    @Path("findPatientData")
-    public String findPatientData(@QueryParam("patientName") String patientName) {
-    	MongoClient client = DBConfig.getMongoDB();
-    	DB mongoDB = client.getDB(SmartCareConstant.DB);
-    	DBCollection alert = mongoDB.getCollection(SmartCareConstant.PATIENT_DATA);
-        BasicDBObject query = new BasicDBObject("PatientName", patientName);
-        DBCursor cursor = alert.find(query);
-        SmartCareUtils.writeLog("Find Patient data for : " + patientName, null);
-        String jsonString = SmartCareUtils.objectToJSON(cursor);
-        client.close();
-        return jsonString;
-    }
+    						  				
     
     public static void main(String[] args)throws ClientProtocolException, IOException {
+    	
     	UserService u = new UserService();
     //	u.saveAlert("AlertId", PRIMARY_DOC, SECONDARY_DOC, "Mr. Patient", "Heart rate too low");
-    	//System.out.println(u.findMyAlerts(PRIMARY_DOC));
+    	//String data = u.findMyAlerts("Scot");
+    	
+    	List<MedicalHistory> mhs = new ArrayList<MedicalHistory>();
+    	MedicalHistory h = new MedicalHistory("Flew and headache", "25.02.2015 at 09:46:32 AM PST");
+    	mhs.add(h);
+    	//h = new MedicalHistory("Flew and headache", "26.02.2015 at 05:46:32 PM PST");
+    	//mhs.add(h);
+    	//h = new MedicalHistory("Flew and headache", "22.02.2015 at 10:46:32 AM PST");
+    	//mhs.add(h);
+    	
+    	Gson gson = new Gson();
+    	String medHistoryString = gson.toJson(mhs);
+    	//JsonArray js = new JsonArray();
+    	
+    	//System.out.println(medHistoryString);
+    	//u.savePatientData("Pradeep", 44, "M", "1670 Tupolo Dr. San Jose, CA 95124", medHistoryString, null, "pradeep");
+    	String data = null ; //u.findPatientDataFromGimbalId("pradeep");
+    	//System.out.println("DATA : " + data);
+    	
+    	//u.updateHeartRate("Pradeep", 95);
     	//u.makeAppointment("Pradeep", "Dr. Foo", SmartCareUtils.getDateAndTime());
     	//u.patientCheckIn("Pradeep", true);
     	
     	//AdminService a = new AdminService();
     	//a.makePayment("Pradeep", "Dr. Foo", 25.0);
-    	System.out.println(SmartCareUtils.runService("http://localhost:8080/SmartCareAWS/rest/UserService/findAlerts?patientName=Mr.%20Patient"));
+//    	String jSonString = SmartCareUtils.runService("http://localhost:8080/SmartCareAWS/rest/UserService/findAlerts?patientName=Mr.%20Patient");
+    	
+    	
+    	//System.out.println("DATA : " + data);
+    	//data = data.replace("\"", "'");
+    	gson = new Gson();
+    	JsonArray objs = gson.fromJson(data, JsonArray.class);
+
+    	
+    	for(JsonElement obj : objs) {
+//    		String id = ((JsonObject)obj).get("_id").toString();
+//    		System.out.println("Before : " + id);
+//    		System.out.println("After ID : " + ((JsonObject)((JsonObject)obj).get("_id")).get("$oid"));
+//    		System.out.println("PatientName : " + ((JsonObject)obj).get("PatientName").toString().replace("\"", ""));
+    		
+    		//System.out.println("Med Data : " + ((JsonObject)obj).get("PastMedHistory").toString().replace("\\", "") );
+    		
+    		//String histString = "[{\"description\":\"Flew and headache\",\"dateString\":\"25.02.2015 at 09:46:32 AM PST\"}]";
+    		
+  
+    		JsonArray histArray  = gson.fromJson(((JsonObject)obj).get("PastMedHistory").getAsString(), JsonArray.class);
+    		
+    		for (JsonElement hist : histArray ) {
+    			System.out.println("Description : " + ((JsonObject)hist).get("description"));
+    			System.out.println("Description : " + ((JsonObject)hist).get("dateString"));
+    		}
+    		
+    	}
     	
     }
 }

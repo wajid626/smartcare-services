@@ -16,8 +16,8 @@ public class PatientAlert {
 	  When this application is run, make sure AwsCredentials.properties file is in the class path.
 	  Content of AwsCredentials.properties
 	  		#Insert your AWS Credentials from http://aws.amazon.com/security-credentials
-			secretKey=pbIZ0xxLijCleRBaLJ1ZJE3bPNR8KBb+BVAE/4M7
-			accessKey=AKIAILCPOVMWROXGNBIA
+			secretKey=xxxxxxxx
+			accessKey=yyyyyyyy
 	 */
 	
 	/**
@@ -26,7 +26,7 @@ public class PatientAlert {
 	 * @param message
 	 * @return
 	 */
-	public void pushAlert(String subject, String message) {
+	public String pushAlert(String subject, String message) {
 		AmazonSNSClient snsClient = new AmazonSNSClient(new ClasspathPropertiesFileCredentialsProvider());		
 		snsClient.setRegion(Region.getRegion(Regions.US_WEST_2));
 		
@@ -34,5 +34,6 @@ public class PatientAlert {
 		publishRequest.setSubject(subject);
 		PublishResult publishResult = snsClient.publish(publishRequest);
 		SmartCareUtils.writeLog("Push message :" + message + ". Message Id : " + publishResult.getMessageId(), null);
+		return publishResult.getMessageId();
 	}
 }

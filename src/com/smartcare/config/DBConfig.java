@@ -11,7 +11,8 @@ public class DBConfig {
         public static final int MONGODB_PORT = 27017;
         private static Boolean CLOUD_DEPLOYMENT = false;
 
-        public static final String MONGO_CLOUD_URI = "mongodb://54.186.113.79:27017/mydb";
+        //ublic static final String MONGO_CLOUD_URI = "mongodb://52.10.200.151:27017/smartcare";
+        public static final String MONGO_CLOUD_URI = "mongodb://52.10.176.98:27017/smartcare";
         public static final String MONGO_LOCALE_URI = "mongodb://:@localhost:27017/smartcare";
 
         public static MongoClient getMongoDB() {

@@ -15,4 +15,5 @@ public class SmartCareConstant {
     public static final String PAYMENT = "payment";
     public static final String BEACON = "beacon";
     public static final String MEDICAL_HISTORY = "medicinehistory";
+    public static final String PATIENT_MED_HISTORY="patientmedhistory";
 }
