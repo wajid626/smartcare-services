@@ -2,6 +2,7 @@ package com.smartcare.user;
 
 import java.sql.Connection;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
@@ -38,6 +39,7 @@ import java.io.StringReader;
 
 import org.apache.http.client.ClientProtocolException;
 import org.bson.types.ObjectId;
+import org.javatuples.Pair;
 
 
 
@@ -326,7 +328,7 @@ public class UserService {
     @GET
     @Path("makeAppointment")
     public boolean makeAppointment(@QueryParam("patientName") String patientName, @QueryParam("physicianName") String physicianName, 
-    							   @QueryParam("dateTime") String dateTime) {
+    							   @QueryParam("dateTime") String dateTime, @QueryParam("location") String location) {
     	MongoClient client = DBConfig.getMongoDB();
     	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	DBCollection appointment = mongoDB.getCollection(SmartCareConstant.APPOINTMENT);
@@ -334,7 +336,8 @@ public class UserService {
     							.append("PhysicianName", physicianName)
     							.append("CheckInStatus", false)
     							.append("CheckInDateTime",null)
-    							.append("CreateDate", dateTime);
+    							.append("AppointmentDateTime", dateTime)
+    							.append("Location", location);
     	String error = appointment.insert(doc).getError();
     	SmartCareUtils.writeLog("Create Appointment for User : " + patientName, error);
     	client.close();
@@ -349,13 +352,13 @@ public class UserService {
      */
     @GET
     @Path("patientCheckIn")
-    public boolean patientCheckIn(@QueryParam("patientName") String patientName, @QueryParam("checkInStatus") boolean checkInStatus) {
+    public boolean patientCheckIn(@QueryParam("patientName") String patientName, @QueryParam("location") String location) {
     	MongoClient client = DBConfig.getMongoDB();
     	DB mongoDB = client.getDB(SmartCareConstant.DB);
     	
     	//1. Find the Appointment and update the CheckIn Status
     	DBCollection appointment = mongoDB.getCollection(SmartCareConstant.APPOINTMENT);
-    	BasicDBObject query = new BasicDBObject("PatientName", patientName);
+    	BasicDBObject query = new BasicDBObject("PatientName", patientName).append("Location", location);
      
     	DBCursor cursor = appointment.find(query);		
         
@@ -389,6 +392,34 @@ public class UserService {
     	return true;
     }
     
+    @GET
+    @Path("patientCheckOut")
+    public boolean patientCheckOut(@QueryParam("patientName") String patientName, @QueryParam("appointmentDateTime") String appointmentDateTime) {
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
+    	
+    	//1. Find the Appointment and update the CheckOut Status
+    	DBCollection appointment = mongoDB.getCollection(SmartCareConstant.APPOINTMENT);
+    	BasicDBObject query = new BasicDBObject("PatientName", patientName).append("AppointmentDateTime", appointmentDateTime);
+    	
+    	DBCursor cursor = appointment.find(query);		
+        
+        if ( cursor == null || !cursor.hasNext() ) {
+        	SmartCareUtils.writeLog("Patient Check-out for Patient failed: " + patientName + "  AppointmentDateTime : " + appointmentDateTime, null);
+        	return false;
+        }
+        
+    	BasicDBObject checkOut = new BasicDBObject();
+    	checkOut.append("$set", new BasicDBObject().append("CheckOutStatus", true));
+    	
+    	WriteResult result = appointment.update(query, checkOut);
+        if ( null != result.getError()) {
+        	SmartCareUtils.writeLog("Patient Check-in for Patient failed: " + patientName, result.getError());
+        	return false;
+        }
+        return true;
+    }
+    
     /**
      * 
      * @param patientName
@@ -417,65 +448,111 @@ public class UserService {
     	}
     	return error == null;
     }
-    						  				
+    	
+    
+    private List<String> allAppointmentSlots = Arrays.asList("10:00 AM - 11:00 AM", "11:00 AM - 12:00 PM","12:00 PM - 01:00 PM","01:00 PM - 02:00 PM", 
+    										   "02:00 PM - 03:00 PM", "03:00 PM - 04:00 PM", "04:00 PM - 05:00 PM");
+    @GET
+    @Path("retrieveAppointments")
+    public String retrieve(@QueryParam("doctorName") String doctorName, @QueryParam("appointmentDate") String appointmentDate,
+    					   @QueryParam("location") String location) {
+    	
+    	//1. Check appointmentSlots for the given condition. If no data found, all the slots are available.
+    	//   So, create a new record and return the appointment list.
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
+    	DBCollection appointmentSlots = mongoDB.getCollection(SmartCareConstant.APPOINTMENT_SLOTS);
+    	
+    	BasicDBObject query = new BasicDBObject("DoctorName", doctorName)
+    							.append("Location", location)
+    							.append("AppointmentDate", appointmentDate);
+    	DBCursor cursor = appointmentSlots.find(query);
+    	
+    	
+    	String jsonString =  SmartCareUtils.objectToJSON(cursor);
+    	
+    	if (cursor.count() == 0) {
+    		// Create a record with all available slots between 10:00 AM - 05:00 PM
+    		query.append("AvailableAppointMents", allAppointmentSlots.toString());
+    		appointmentSlots.insert(query);
+    		cursor = appointmentSlots.find(query);
+    		jsonString =  SmartCareUtils.objectToJSON(cursor);
+    	}
+    	SmartCareUtils.writeLog("Retrieve appointment for : " + doctorName + " Location :" + location + " AppointmentDate : " + appointmentDate, 
+    					null);
+    	
+    	return jsonString;
+    }
+    
+    @GET
+    @Path("insertAppointmentSlot")
+    public boolean insertAppointmentSlot(@QueryParam("doctorName") String doctorName, @QueryParam("appointmentDate") String appointmentDate,
+			   @QueryParam("location") String location, @QueryParam("timeSlot") String timeSlot) {
+    	
+    	MongoClient client = DBConfig.getMongoDB();
+    	DB mongoDB = client.getDB(SmartCareConstant.DB);
+    	DBCollection appointmentSlots = mongoDB.getCollection(SmartCareConstant.APPOINTMENT_SLOTS);
+    	
+    	BasicDBObject query = new BasicDBObject("DoctorName", doctorName)
+    							.append("Location", location)
+    							.append("AppointmentDate", appointmentDate);
+    	DBCursor cursor = appointmentSlots.find(query);
+    	
+    	
+    	String jsonString =  SmartCareUtils.objectToJSON(cursor);
+    	
+    	Gson gson = new Gson();
+        JsonArray data = gson.fromJson(jsonString, JsonArray.class);
+      
+        //Get the current Appointment List
+        List<String> apts = new ArrayList<String>();
+        for(JsonElement obj : data) {
+        	System.out.println("Appointment data  :" + ((JsonObject)obj).get("AvailableAppointMents").toString());
+        	
+        	for (String s : ((JsonObject)obj).get("AvailableAppointMents").getAsString().replace("[", "").replace("]","").split(",") ) {
+        		apts.add(s.trim());
+        	}
+        }
+        
+        //Remove the timeSlot that is requested
+        apts.remove(timeSlot);
+        
+        //Update the record.
+        BasicDBObject newSlot = new BasicDBObject();
+        newSlot.append("$set", new BasicDBObject().append("AvailableAppointMents", apts.toString()));
+
+        WriteResult result = appointmentSlots.update(query, newSlot);
+       
+        if ( null != result.getError()) {
+        	SmartCareUtils.writeLog("Insert Appointment slot failed for : " + doctorName +  " " + location + 
+        							" " + appointmentDate + " " + timeSlot, result.getError());
+        	return false;
+        }
+        
+    	return true;
+    }
     
     public static void main(String[] args)throws ClientProtocolException, IOException {
     	
     	UserService u = new UserService();
-    //	u.saveAlert("AlertId", PRIMARY_DOC, SECONDARY_DOC, "Mr. Patient", "Heart rate too low");
-    	//String data = u.findMyAlerts("Scot");
-    	
-    	List<MedicalHistory> mhs = new ArrayList<MedicalHistory>();
-    	MedicalHistory h = new MedicalHistory("Flew and headache", "25.02.2015 at 09:46:32 AM PST");
-    	mhs.add(h);
-    	//h = new MedicalHistory("Flew and headache", "26.02.2015 at 05:46:32 PM PST");
-    	//mhs.add(h);
-    	//h = new MedicalHistory("Flew and headache", "22.02.2015 at 10:46:32 AM PST");
-    	//mhs.add(h);
-    	
-    	Gson gson = new Gson();
-    	String medHistoryString = gson.toJson(mhs);
-    	//JsonArray js = new JsonArray();
-    	
-    	//System.out.println(medHistoryString);
-    	//u.savePatientData("Pradeep", 44, "M", "1670 Tupolo Dr. San Jose, CA 95124", medHistoryString, null, "pradeep");
-    	String data = null ; //u.findPatientDataFromGimbalId("pradeep");
-    	//System.out.println("DATA : " + data);
-    	
-    	//u.updateHeartRate("Pradeep", 95);
-    	//u.makeAppointment("Pradeep", "Dr. Foo", SmartCareUtils.getDateAndTime());
-    	//u.patientCheckIn("Pradeep", true);
-    	
-    	//AdminService a = new AdminService();
-    	//a.makePayment("Pradeep", "Dr. Foo", 25.0);
-//    	String jSonString = SmartCareUtils.runService("http://localhost:8080/SmartCareAWS/rest/UserService/findAlerts?patientName=Mr.%20Patient");
-    	
-    	
-    	//System.out.println("DATA : " + data);
-    	//data = data.replace("\"", "'");
-    	gson = new Gson();
-    	JsonArray objs = gson.fromJson(data, JsonArray.class);
-
-    	
-    	for(JsonElement obj : objs) {
-//    		String id = ((JsonObject)obj).get("_id").toString();
-//    		System.out.println("Before : " + id);
-//    		System.out.println("After ID : " + ((JsonObject)((JsonObject)obj).get("_id")).get("$oid"));
-//    		System.out.println("PatientName : " + ((JsonObject)obj).get("PatientName").toString().replace("\"", ""));
-    		
-    		//System.out.println("Med Data : " + ((JsonObject)obj).get("PastMedHistory").toString().replace("\\", "") );
-    		
-    		//String histString = "[{\"description\":\"Flew and headache\",\"dateString\":\"25.02.2015 at 09:46:32 AM PST\"}]";
-    		
-  
-    		JsonArray histArray  = gson.fromJson(((JsonObject)obj).get("PastMedHistory").getAsString(), JsonArray.class);
-    		
-    		for (JsonElement hist : histArray ) {
-    			System.out.println("Description : " + ((JsonObject)hist).get("description"));
-    			System.out.println("Description : " + ((JsonObject)hist).get("dateString"));
-    		}
-    		
-    	}
-    	
+    	String jsonString =  u.retrieve("Pradeep", "01Mar2015", "San Jose");
+        
+        System.out.println("DATA : " + jsonString);
+        
+        Gson gson = new Gson();
+        JsonArray data = gson.fromJson(jsonString, JsonArray.class);
+      
+        List<String> apts = new ArrayList<String>();
+        for(JsonElement obj : data) {
+        	for (String s : ((JsonObject)obj).get("AvailableAppointMents").getAsString().replace("[", "").replace("]","").split(",") ) {
+        		apts.add(s.trim());
+        	}
+        }
+        
+        for(String s : apts) {
+        	System.out.println("["+s+"]");
+        }
+        
+      //System.out.println("DATA : " + u.insertAppointmentSlot("Pradeep", "01Mar2015", "San Jose", "03:00 PM - 04:00 PM"));
     }
 }
