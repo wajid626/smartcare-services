@@ -1,3 +1,4 @@
+<%@page import="com.smartcare.utils.SmartCareUtils"%>
 <%@page import="com.smartcare.analytic.SmartCareLog"%>
 <%@page import="java.util.Random"%>
 <%@page import="java.util.Map"%>
@@ -31,6 +32,7 @@
 	<tr>
 	<td align="center" style="font-size:25px"><b>SmartCare Log</b></td>
 	<td width="5%" align="right"><b></b><a style="font-color:white;" href="?delete=true">Clear Log</a></b></td>
+	<td width="10%" align="right"><b></b><a style="font-color:white;" href="?clearCache=true">Clear Cache</a></b></td>
 	</tr>
 </table>
 <p/>
@@ -38,6 +40,11 @@
 	List<SmartCareLog> logData = new ArrayList<SmartCareLog>();
 	
 	try{
+		if ( null != request.getParameter("clearCache")) {
+			SmartCareUtils.clearCache();
+			response.sendRedirect("logs.jsp");
+		}
+		
 		boolean delete = false;
 		if ( null != request.getParameter("delete")) {
 			delete = Boolean.parseBoolean(request.getParameter("delete"));

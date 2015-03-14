@@ -21,6 +21,9 @@ public class SmartCareConstant {
     public static final String PATIENT_MED_HISTORY="patientmedhistory";
     public static final String APPOINTMENT_SLOTS = "appointmentslots";
     
+    public static final String CACHING_SERVER = "smartcarecache.uohhyj.0001.usw2.cache.amazonaws.com";
+    public static final int CACHING_PORT = 11211;
+    
     public static List<String> getAllTableNames() {
     	List<String> tables = new ArrayList<String>();
     	
