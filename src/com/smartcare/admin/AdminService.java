@@ -3,6 +3,7 @@ package com.smartcare.admin;
 import java.sql.Connection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -33,14 +34,18 @@ public class AdminService {
     	MongoClient client = DBConfig.getMongoDB();
     	DB mongoDB = client.getDB(SmartCareConstant.DB);
 		DBCollection appointment = mongoDB.getCollection(SmartCareConstant.APPOINTMENT);
-        BasicDBObject query = new BasicDBObject("PatientName", patientName);
-        DBCursor cursor = appointment.find(query);
+        
+		//Case insensitive Patient Name Search
+		BasicDBObject regexQuery = new BasicDBObject();
+		regexQuery.put("PatientName", new BasicDBObject("$regex", patientName).append("$options", "i"));
+        DBCursor cursor = appointment.find(regexQuery);
+             
         SmartCareUtils.writeLog("Get Patient Appointment Details for : " + patientName, null);
         String jsonString =  SmartCareUtils.objectToJSON(cursor);
         client.close();
         return jsonString;
-	}
-	
+	} 
+    
     @GET
     @Path("logs")
 	public String logs() {
