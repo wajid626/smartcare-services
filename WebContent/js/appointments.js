@@ -10,7 +10,7 @@ var movie =  Ext.define('appointmentsmodel', {
            {name: 'PhysicianName', 	type: 'string'},
            {name: 'AppointmentDate',   type: 'string'},
            {name: 'AppointmentTime',   type: 'string'},
-           {name: 'CheckinStatus',   type: 'boolean'},
+           {name: 'CheckInStatus',   type: 'boolean'},
            
           
         ]
@@ -56,7 +56,7 @@ var movie =  Ext.define('appointmentsmodel', {
             width:'15%'
         },  {
             text: 'Checkin Status',
-            dataIndex: 'CheckinStatus',
+            dataIndex: 'CheckInStatus',
             width:'20%'
         }
         
