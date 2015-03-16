@@ -10,6 +10,7 @@ var movie =  Ext.define('appointmentsmodel', {
            {name: 'PhysicianName', 	type: 'string'},
            {name: 'AppointmentDate',   type: 'string'},
            {name: 'AppointmentTime',   type: 'string'},
+           {name: 'Location',   type: 'string'},
            {name: 'CheckInStatus',   type: 'boolean'},
            
           
@@ -39,11 +40,11 @@ var movie =  Ext.define('appointmentsmodel', {
         columns: [{
             text: 'Patient Name',
             dataIndex: 'PatientName',
-            width:'25%'
+            width:'20%'
         }, {
             text: 'Physician Name',
             dataIndex: 'PhysicianName',
-            width:'25%'
+            width:'20%'
         },
         {
             text: 'Appointment Date',
@@ -54,10 +55,16 @@ var movie =  Ext.define('appointmentsmodel', {
             text: 'Appointment Time',
             dataIndex: 'AppointmentTime',
             width:'15%'
-        },  {
+        }, 
+        {
+            text: 'Location',
+            dataIndex: 'Location',
+            width:'15%'
+        }, 
+        {
             text: 'Checkin Status',
             dataIndex: 'CheckInStatus',
-            width:'20%'
+            width:'15%'
         }
         
         ],
